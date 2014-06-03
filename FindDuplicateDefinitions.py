@@ -5,7 +5,7 @@
 #
 #   Scans a FLEx database checking for duplicate definitions in the same sense.
 #
-#   An error message is added to the FT_Flags (sense-level) field if database
+#   An error message is added to the FTFlags (entry-level) field if database
 #   changes are enabled. This allows easy filtering in FLEx to correct the errors.
 #
 # Marcin Miłkowski
@@ -24,36 +24,30 @@ from types import *
 
 TestNumberOfEntries  = -1   # -1 for whole DB; else no. of db entries to scan
 
-TestSuite = [
-       (re.compile(r"[?!\.]{1}$"), False, "ERR:no-ending-punc"),
-       (re.compile(r"[?!\.]{2,}$"), True, "ERR:too-much-punc")
-
-       ]
 
 #----------------------------------------------------------------
 # Documentation that the user sees:
 
-docs = {'moduleName'       : "Find duplicate definitions",
+docs = {'moduleName'       : "Find Duplicate Definitions",
         'moduleVersion'    : 1,
         'moduleModifiesDB' : True,
         'moduleSynopsis'   : "Finds entries with duplicate definitions.",
         'moduleDescription':
 u"""
-
 If database modification is permitted, then a warning value will be appended
-to the sense-level custom field called FTFlags. This field must already exist
+to the entry-level custom field called FTFlags. This field must already exist
 and should be created as a 'Single-line text' field using the 'First Analysis
 Writing System.'
 """ }
 
 
 def list_duplicates(seq):
-  seen = set()
-  seen_add = seen.add
-  # adds all elements it doesn't know yet to seen and all other to seen_twice
-  seen_twice = set( x for x in seq if x in seen or seen_add(x) )
-  # turn the set into a list (as requested)
-  return list( seen_twice )
+    seen = set()
+    seen_add = seen.add
+    # adds all elements it doesn't know yet to seen and all other to seen_twice
+    seen_twice = set( x for x in seq if x in seen or seen_add(x) )
+    # turn the set into a list (as requested)
+    return list( seen_twice )
 
 #----------------------------------------------------------------
 # The main processing function
@@ -61,17 +55,9 @@ def list_duplicates(seq):
 def MainFunction(DB, report, modifyAllowed):
     """
     This is the main processing function.
-
-    This example illustrates:
-     - Processing over all lexical entries and their senses.
-     - Adding a message to a custom field.
-     - Report messages that give feedback and information to the user.
-     - Report messages that include a hyperlink to the entry (for Warning & Error only).
-    
     """
+
     report.Info("Beginning Definition Check")
-    #report.Warning("The sky is falling!")
-    #report.Error("Failed to ...")
     
     limit = TestNumberOfEntries
 
@@ -82,23 +68,25 @@ def MainFunction(DB, report, modifyAllowed):
 
     AddReportToField = modifyAllowed
 
-    flagsField = DB.LexiconGetSenseCustomFieldNamed("FTFlags")
+    flagsField = DB.LexiconGetEntryCustomFieldNamed("FTFlags")
     if AddReportToField and not flagsField:
-        report.Error("FT_Flags custom field doesn't exist at Sense level")
+        report.Error("FTFlags custom field doesn't exist at Entry level")
         AddReportToField = False
     
     for e in DB.LexiconAllEntries():
         lexeme = DB.LexiconGetLexemeForm(e)
         list = []
         for sense in e.SensesOS:
-			list.extend(DB.LexiconGetSenseDefinition(sense).split("; "))			
-				
+            defn = DB.LexiconGetSenseDefinition(sense)
+            if defn:
+                list.extend(defn.split("; "))			
+
         if list_duplicates(list):
-			report.Info("Found duplicate in: " + lexeme + ": " + " ,".join(list_duplicates(list)))
-			if AddReportToField:
-				#oldtag = DB.LexiconGetFieldText(sense, flagsField)
-				DB.LexiconSetFieldText(sense, flagsField, "Duplicate definition found: " + " ,".join(list_duplicates(list)))
-				#DB.LexiconAddTagToField(sense, flagsField, message)           
+            report.Info("Found duplicate in: " + lexeme + ": " + " ,".join(list_duplicates(list)),
+                        DB.BuildGotoURL(e))
+            if AddReportToField:
+                DB.LexiconSetFieldText(e, flagsField, "Duplicate definition found: " + " ,".join(list_duplicates(list)))
+
         if limit > 0:
            limit -= 1
         elif limit == 0:
